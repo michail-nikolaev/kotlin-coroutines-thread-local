@@ -23,4 +23,13 @@ class ApplicationTest {
             }
         }
     }
+
+    @Test
+    fun testAlsoBroken() {
+        withTestApplication({ module(testing = true) }) {
+            handleRequest(HttpMethod.Get, "/also-broken").apply {
+                assertEquals(HttpStatusCode.InternalServerError, response.status())
+            }
+        }
+    }
 }

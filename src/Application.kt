@@ -3,6 +3,7 @@ package bug.reproduce
 import io.ktor.application.*
 import io.ktor.client.*
 import io.ktor.client.request.*
+import io.ktor.features.*
 import io.ktor.http.*
 import io.ktor.response.*
 import io.ktor.routing.*
@@ -69,6 +70,12 @@ fun main(args: Array<String>): Unit = io.ktor.server.netty.EngineMain.main(args)
 fun Application.module(testing: Boolean = false) {
     install(RequestContextKtorFeature)
 
+    install(StatusPages) {
+        exception<Throwable> { cause ->
+            call.respond(HttpStatusCode.InternalServerError)
+        }
+    }
+
     routing {
         get("/broken") {
             val htmlContent = HttpClient().request<String> {
@@ -79,6 +86,9 @@ fun Application.module(testing: Boolean = false) {
         }
         get("/works") {
             call.respondText("HELLO WORLD!", contentType = ContentType.Text.Plain)
+        }
+        get("/also-broken") {
+            throw IllegalStateException()
         }
     }
 }
