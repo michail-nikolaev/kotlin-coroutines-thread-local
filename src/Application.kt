@@ -1,15 +1,26 @@
 package bug.reproduce
 
-import io.ktor.application.*
-import io.ktor.client.*
-import io.ktor.client.request.*
-import io.ktor.features.*
-import io.ktor.http.*
-import io.ktor.response.*
-import io.ktor.routing.*
-import io.ktor.util.*
-import io.ktor.util.pipeline.*
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.cio.CIO
+import io.ktor.client.request.request
+import io.ktor.client.statement.bodyAsText
+import io.ktor.http.ContentType
+import io.ktor.http.HttpMethod
+import io.ktor.http.HttpStatusCode
+import io.ktor.server.application.Application
+import io.ktor.server.application.ApplicationCall
+import io.ktor.server.application.ApplicationCallPipeline
+import io.ktor.server.application.BaseApplicationPlugin
+import io.ktor.server.application.call
+import io.ktor.server.application.install
+import io.ktor.server.plugins.statuspages.StatusPages
+import io.ktor.server.response.respondText
+import io.ktor.server.routing.get
+import io.ktor.server.routing.routing
+import io.ktor.util.AttributeKey
+import io.ktor.util.pipeline.PipelinePhase
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asContextElement
 import kotlinx.coroutines.withContext
 import kotlin.random.Random
@@ -41,7 +52,7 @@ class RequestContextKtorFeature(
         }
     }
 
-    companion object Feature : ApplicationFeature<Application, Configuration, RequestContextKtorFeature> {
+    companion object Feature : BaseApplicationPlugin<Application, Configuration, RequestContextKtorFeature> {
         override val key: AttributeKey<RequestContextKtorFeature> = AttributeKey("RequestContext")
 
         override fun install(pipeline: Application, configure: Configuration.() -> Unit): RequestContextKtorFeature {
@@ -71,18 +82,19 @@ fun Application.module(testing: Boolean = false) {
     install(RequestContextKtorFeature)
 
     install(StatusPages) {
-        exception<Throwable> { cause ->
-            call.respond(HttpStatusCode.InternalServerError)
+        exception<Throwable> { call, cause ->
+            call.respondText(text = "500: $cause", status = HttpStatusCode.InternalServerError)
         }
     }
 
     routing {
         get("/broken") {
-            val htmlContent = HttpClient().request<String> {
-                url("https://en.wikipedia.org/wiki/Main_Page")
+            val client = HttpClient(CIO)
+
+            val htmlContent = client.request("https://en.wikipedia.org/wiki/Main_Page") {
                 method = HttpMethod.Get
             }
-            call.respondText(htmlContent, contentType = ContentType.Text.Plain)
+            call.respondText(htmlContent.bodyAsText(), contentType = ContentType.Text.Plain)
         }
         get("/works") {
             call.respondText("HELLO WORLD!", contentType = ContentType.Text.Plain)
